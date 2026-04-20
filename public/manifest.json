@@ -3,6 +3,7 @@
   "short_name": "시간표",
   "description": "나만의 시간표를 손쉽게 관리하세요.",
   "start_url": "/",
+  "scope": "/",
   "url_handlers": [
     {
       "origin": "https://timetable-three-pink.vercel.app"
