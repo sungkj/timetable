@@ -91,6 +91,7 @@ body {
 .fab-item {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   background: var(--fab-bg);
   color: var(--foreground);
@@ -135,7 +136,7 @@ body {
 }
 
 .add-button.open {
-  transform: rotate(90deg);
+  transform: rotate(135deg); /* + 기호를 대각선으로 돌려 완벽한 X 모양을 만듦 */
   background-color: #666;
 }
 
