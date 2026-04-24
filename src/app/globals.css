@@ -116,13 +116,13 @@ body {
 }
 
 .add-button {
-  width: 60px;
-  height: 60px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background-color: var(--primary-color);
   color: white;
   border: none;
-  font-size: 30px;
+  font-size: 20px;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
   display: flex;
@@ -135,7 +135,7 @@ body {
 }
 
 .add-button.open {
-  transform: rotate(45deg);
+  transform: rotate(90deg);
   background-color: #666;
 }
 
