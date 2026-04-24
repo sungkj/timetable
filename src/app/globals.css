@@ -206,12 +206,13 @@ body {
 .timetable-header {
   display: grid;
   grid-template-columns: 40px repeat(7, 1fr);
+  align-items: center;
   text-align: center;
   font-weight: bold;
   border-bottom: 2px solid var(--foreground);
   padding-bottom: 8px;
   background-color: var(--header-bg);
-  font-size: 0.7rem;
+  font-size: 0.8rem;
 }
 
 .timetable-grid {

@@ -554,8 +554,22 @@ export default function TimetablePage() {
 
       <div className="timetable-wrapper">
         <div className="timetable-header">
-          <div className="time-label-header">시간</div>
-          {DAYS.map((day, i) => <div key={day} style={{ color: i === currentDayIndex ? "red" : "inherit" }}>{day} {i === currentDayIndex && "●"}</div>)}
+          <div className="time-label-header" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>시간</div>
+          {DAYS.map((day, i) => (
+            <div 
+              key={day} 
+              style={{ 
+                color: i === currentDayIndex ? "red" : "inherit", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                gap: "3px" 
+              }}
+            >
+              <span>{day}</span>
+              {i === currentDayIndex && <span style={{ fontSize: "0.45rem" }}>●</span>}
+            </div>
+          ))}
         </div>
         <div className="timetable-grid" ref={gridRef}>
           <div className="time-labels-column">{HOURS.map(hour => <div key={hour} className="time-slot-label">{formatLabel(`${hour}:00`)}</div>)}</div>
