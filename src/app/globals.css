@@ -203,6 +203,14 @@ body {
 .btn-cancel { background: var(--label-bg); color: var(--foreground); }
 
 /* 시간표 그리드 */
+.timetable-main-title {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin: 0 0 5px 0;
+  color: var(--foreground);
+}
+
 .timetable-header {
   display: grid;
   grid-template-columns: 40px repeat(7, 1fr);

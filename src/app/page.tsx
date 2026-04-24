@@ -42,6 +42,7 @@ export default function TimetablePage() {
   const [menuData, setMenuData] = useState<{ id: string, x: number, y: number } | null>(null);
   const [isLocked, setIsLocked] = useState(true); // 기본값: 안전하게 잠금 상태로 시작
   const isLockedRef = useRef(true); // GSAP 콜백에서 최신 상태를 참조하기 위한 Ref
+  const [timetableTitle, setTimetableTitle] = useState("시간표"); // 시간표 제목 상태
   
   const gridRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<TimetableEvent[]>([]);
@@ -77,6 +78,7 @@ export default function TimetablePage() {
     // URL에서 공유 데이터 확인 및 즉시 적용
     const params = new URLSearchParams(window.location.search);
     const sharedData = params.get("data");
+    const sharedTitle = params.get("title");
 
     if (sharedData) {
       try {
@@ -103,6 +105,10 @@ export default function TimetablePage() {
           if (confirm("공유받은 시간표 데이터가 있습니다. 현재 데이터를 덮어씌울까요?")) {
             setEvents(importedEvents);
             localStorage.setItem("my-timetable-events", JSON.stringify(importedEvents));
+            if (sharedTitle) {
+              setTimetableTitle(sharedTitle);
+              localStorage.setItem("my-timetable-title", sharedTitle);
+            }
           }
           window.history.replaceState({}, document.title, window.location.pathname);
           setIsLoaded(true);
@@ -112,6 +118,9 @@ export default function TimetablePage() {
         console.error("데이터 임포트 실패", e);
       }
     }
+
+    const savedTitle = localStorage.getItem("my-timetable-title");
+    if (savedTitle) setTimetableTitle(savedTitle);
 
     setEvents(initialEvents);
     setIsLoaded(true);
@@ -140,14 +149,14 @@ export default function TimetablePage() {
     }).join("*");
 
     const encodedData = btoa(unescape(encodeURIComponent(customFormat)));
-    const shareUrl = `${window.location.origin}/?data=${encodedData}`;
+    const shareUrl = `${window.location.origin}/?data=${encodedData}&title=${encodeURIComponent(timetableTitle)}`;
     
     // 1. 모바일 기기 자체 공유 기능 시도 (HTTPS에서만 작동)
     if (navigator.share) {
       try {
         await navigator.share({
           title: '시간표 공유',
-          text: '제 시간표를 확인해보세요!',
+          text: `<시간표 공유> ${timetableTitle}`,
           url: shareUrl,
         });
         setIsMenuOpen(false);
@@ -186,6 +195,15 @@ export default function TimetablePage() {
         prompt("아래 링크를 길게 눌러 복사하여 공유하세요:", shareUrl);
       }
     }  
+    setIsMenuOpen(false);
+  };
+
+  const handleEditTitle = () => {
+    const newTitle = window.prompt("시간표 제목을 입력하세요.", timetableTitle);
+    if (newTitle !== null && newTitle.trim() !== "") {
+      setTimetableTitle(newTitle.trim());
+      localStorage.setItem("my-timetable-title", newTitle.trim());
+    }
     setIsMenuOpen(false);
   };
 
@@ -514,11 +532,13 @@ export default function TimetablePage() {
       {isLocked && (
         <div 
           onClick={toggleLock}
-          style={{ position: "fixed", top: "37px", right: "12px", zIndex: 50, background: "rgba(0,0,0,0.6)", color: "#fff", padding: "6px 6px", borderRadius: "20px", fontSize: "7px", cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.2)" }}
+          style={{ position: "fixed", top: "10px", right: "12px", zIndex: 50, background: "rgba(0,0,0,0.6)", color: "#fff", padding: "6px 6px", borderRadius: "20px", fontSize: "7px", cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.2)" }}
         >
           🔒 보기 모드
         </div>
       )}
+
+      <h1 className="timetable-main-title">{timetableTitle}</h1>
 
       {/* 플로팅 메뉴 버튼 */}
       <div className="fab-container">
@@ -527,6 +547,7 @@ export default function TimetablePage() {
             {isLocked ? "🔓 편집 모드로 전환" : "🔒 시간표 잠금"}
           </div>
           <div className="fab-item" onClick={openAddModal}>일정 추가</div>
+          <div className="fab-item" onClick={handleEditTitle}>제목 편집</div>
           <div className="fab-item" onClick={handleShare}>공유</div>
           <div className="fab-item delete-all" onClick={handleDeleteAll}>일정 모두 삭제</div>
         </div>
