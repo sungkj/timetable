@@ -60,12 +60,6 @@ export default function TimetablePage() {
   useEffect(() => {
     setNow(new Date());
     
-    const savedLock = localStorage.getItem("my-timetable-lock");
-    if (savedLock !== null) {
-      setIsLocked(savedLock === "true");
-      isLockedRef.current = savedLock === "true";
-    }
-    
     const saved = localStorage.getItem("my-timetable-events");
     let initialEvents: TimetableEvent[] = [];
     if (saved) {
@@ -221,7 +215,6 @@ export default function TimetablePage() {
     const nextLocked = !isLocked;
     setIsLocked(nextLocked);
     isLockedRef.current = nextLocked;
-    localStorage.setItem("my-timetable-lock", String(nextLocked));
     
     // 모든 일정 아이템을 순회하며 Draggable 인스턴스를 찾아 토글
     gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
