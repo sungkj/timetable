@@ -553,7 +553,7 @@ export default function TimetablePage() {
 
       <div className="timetable-wrapper">
         <div className="timetable-header">
-          <div className="time-label-header" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>시간</div>
+          <div className="time-label-header" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}></div>
           {DAYS.map((day, i) => (
             <div 
               key={day} 
