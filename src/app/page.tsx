@@ -146,7 +146,7 @@ export default function TimetablePage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: '내 시간표 공유',
+          title: '시간표 공유',
           text: '제 시간표를 확인해보세요!',
           url: shareUrl,
         });
@@ -155,38 +155,37 @@ export default function TimetablePage() {
       } catch (e) {
         console.log("공유 취소 또는 실패");
       }
-    }
-
-    // 2. 자동 복사 시도 (보안 정책 우회 방식)
-    let success = false;
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(shareUrl);
-        success = true;
-      } else {
-        // HTTP 환경을 위한 구식 복사 방식
-        const textArea = document.createElement("textarea");
-        textArea.value = shareUrl;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        textArea.style.top = "0";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        success = document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-    } catch (err) {
-      success = false;
-    }
-
-    if (success) {
-      alert("공유 링크가 클립보드에 복사되었습니다.\n카톡 등에 붙여넣기 하세요!");
     } else {
-      // 3. 최후의 수단: 수동 복사 팝업
-      prompt("아래 링크를 길게 눌러 복사하여 공유하세요:", shareUrl);
-    }
-    
+      // 2. 자동 복사 시도 (보안 정책 우회 방식)
+      let success = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(shareUrl);
+          success = true;
+        } else {
+          // HTTP 환경을 위한 구식 복사 방식
+          const textArea = document.createElement("textarea");
+          textArea.value = shareUrl;
+          textArea.style.position = "fixed";
+          textArea.style.left = "-9999px";
+          textArea.style.top = "0";
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          success = document.execCommand('copy');
+          document.body.removeChild(textArea);
+        }
+      } catch (err) {
+        success = false;
+      }
+
+      if (success) {
+        alert("공유 링크가 클립보드에 복사되었습니다.\n카톡 등에 붙여넣기 하세요!");
+      } else {
+        // 3. 최후의 수단: 수동 복사 팝업
+        prompt("아래 링크를 길게 눌러 복사하여 공유하세요:", shareUrl);
+      }
+    }  
     setIsMenuOpen(false);
   };
 
