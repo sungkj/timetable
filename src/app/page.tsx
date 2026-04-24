@@ -156,7 +156,7 @@ export default function TimetablePage() {
       try {
         await navigator.share({
           title: '시간표 공유',
-          text: `<시간표 공유> ${timetableTitle}`,
+          text: `${timetableTitle}`,
           url: shareUrl,
         });
         setIsMenuOpen(false);
@@ -165,16 +165,18 @@ export default function TimetablePage() {
         console.log("공유 취소 또는 실패");
       }
     } else {
+      const shareText = `시간표 공유 - ${timetableTitle}\n${shareUrl}`;
+
       // 2. 자동 복사 시도 (보안 정책 우회 방식)
       let success = false;
       try {
         if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(shareUrl);
+          await navigator.clipboard.writeText(shareText);
           success = true;
         } else {
           // HTTP 환경을 위한 구식 복사 방식
           const textArea = document.createElement("textarea");
-          textArea.value = shareUrl;
+          textArea.value = shareText;
           textArea.style.position = "fixed";
           textArea.style.left = "-9999px";
           textArea.style.top = "0";
@@ -192,7 +194,7 @@ export default function TimetablePage() {
         alert("공유 링크가 클립보드에 복사되었습니다.\n카톡 등에 붙여넣기 하세요!");
       } else {
         // 3. 최후의 수단: 수동 복사 팝업
-        prompt("아래 링크를 길게 눌러 복사하여 공유하세요:", shareUrl);
+        prompt("아래 텍스트를 길게 눌러 복사하여 공유하세요:", shareText);
       }
     }  
     setIsMenuOpen(false);
