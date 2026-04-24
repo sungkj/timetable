@@ -535,7 +535,7 @@ export default function TimetablePage() {
           className={`add-button ${isMenuOpen ? 'open' : ''}`} 
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
-          +
+          {isMenuOpen ? '+' : '☰'}
         </button>
       </div>
       
