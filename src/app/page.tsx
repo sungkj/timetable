@@ -40,6 +40,8 @@ export default function TimetablePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); // 메뉴 상태 추가
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [menuData, setMenuData] = useState<{ id: string, x: number, y: number } | null>(null);
+  const [isLocked, setIsLocked] = useState(true); // 기본값: 안전하게 잠금 상태로 시작
+  const isLockedRef = useRef(true); // GSAP 콜백에서 최신 상태를 참조하기 위한 Ref
   
   const gridRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<TimetableEvent[]>([]);
@@ -56,6 +58,12 @@ export default function TimetablePage() {
 
   useEffect(() => {
     setNow(new Date());
+    
+    const savedLock = localStorage.getItem("my-timetable-lock");
+    if (savedLock !== null) {
+      setIsLocked(savedLock === "true");
+      isLockedRef.current = savedLock === "true";
+    }
     
     const saved = localStorage.getItem("my-timetable-events");
     let initialEvents: TimetableEvent[] = [];
@@ -189,25 +197,40 @@ export default function TimetablePage() {
     setIsMenuOpen(false);
   };
 
+  // 잠금 상태 토글 함수
+  const toggleLock = () => {
+    const nextLocked = !isLocked;
+    setIsLocked(nextLocked);
+    isLockedRef.current = nextLocked;
+    localStorage.setItem("my-timetable-lock", String(nextLocked));
+    
+    // 모든 일정 아이템을 순회하며 Draggable 인스턴스를 찾아 토글
+    gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
+      const d = Draggable.get(el);
+      if (d) nextLocked ? d.disable() : d.enable();
+    });
+    setIsMenuOpen(false);
+  };
+
   const initDraggables = () => {
     if (typeof window === "undefined") return;
     
     // 기존 인스턴스 모두 제거
-    const instances = Draggable.get(".event-item");
-    if (instances) {
-      if (Array.isArray(instances)) instances.forEach(d => d.kill());
-      else instances.kill();
-    }
+    gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
+      const d = Draggable.get(el);
+      if (d) d.kill();
+    });
 
     // 각 일정 아이템별로 개별 Draggable 생성
     gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
-      Draggable.create(el, {
+      const d = Draggable.create(el, {
         type: "x,y",
         bounds: ".timetable-grid",
         edgeResistance: 0.65,
         allowNativeTouchScrolling: true, // 터치 스크롤 허용
         trigger: el.querySelector(".event-info"), // 현재 요소 내부의 정보 영역만 트리거로 지정
         onClick: function() {
+          if (isLockedRef.current) return; // 잠금 상태면 클릭 무시
           const id = (this.target as HTMLElement).getAttribute("data-id");
           if (id) {
             // GSAP Draggable 인스턴스의 pointerX, pointerY를 사용하여 터치 위치 확보
@@ -249,7 +272,9 @@ export default function TimetablePage() {
           // 원래 위치로 되돌리기 (기존 로직 유지)
           gsap.set(this.target, { x: 0, y: 0, zIndex: 2, cursor: "grab", opacity: 1 });
         }
-      });
+      })[0];
+      
+      if (isLockedRef.current) d.disable(); // 생성 시 잠금 상태면 비활성화
     });
   };
 
@@ -260,8 +285,7 @@ export default function TimetablePage() {
     if (!targetItem || !gridRef.current) return;
 
     // Draggable 비활성화
-    const draggables = Draggable.get(targetItem);
-    const dInstance = Array.isArray(draggables) ? draggables[0] : draggables;
+    const dInstance = Draggable.get(targetItem);
     if (dInstance) dInstance.disable();
 
     gsap.set(targetItem, { clearProps: "transform", zIndex: 100 });
@@ -487,9 +511,22 @@ export default function TimetablePage() {
 
   return (
     <main className="timetable-container">
+      {/* 보기 모드 배지 (우측 상단 고정) */}
+      {isLocked && (
+        <div 
+          onClick={toggleLock}
+          style={{ position: "fixed", top: "37px", right: "12px", zIndex: 50, background: "rgba(0,0,0,0.6)", color: "#fff", padding: "6px 6px", borderRadius: "20px", fontSize: "7px", cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.2)" }}
+        >
+          🔒 보기 모드
+        </div>
+      )}
+
       {/* 플로팅 메뉴 버튼 */}
       <div className="fab-container">
         <div className={`fab-menu ${isMenuOpen ? 'open' : ''}`}>
+          <div className="fab-item" onClick={toggleLock}>
+            {isLocked ? "🔓 편집 모드로 전환" : "🔒 시간표 잠금"}
+          </div>
           <div className="fab-item" onClick={openAddModal}>일정 추가</div>
           <div className="fab-item" onClick={handleShare}>공유</div>
           <div className="fab-item delete-all" onClick={handleDeleteAll}>일정 모두 삭제</div>
@@ -550,21 +587,25 @@ export default function TimetablePage() {
                       borderColor: colorObj.border
                     }}
                   >
-                    <div 
-                      className="resize-handle resize-handle-top" 
-                      onMouseDown={(e) => handleResizeStart(e, event.id, 'top')} 
-                      onTouchStart={(e) => handleResizeStart(e, event.id, 'top')}
-                    />
+                    {!isLocked && (
+                      <div 
+                        className="resize-handle resize-handle-top" 
+                        onMouseDown={(e) => handleResizeStart(e, event.id, 'top')} 
+                        onTouchStart={(e) => handleResizeStart(e, event.id, 'top')}
+                      />
+                    )}
                     <div className="event-info">
                       <strong>{event.title}</strong><br/>
                       <small>{format12h(event.startTime)}-{format12h(event.endTime)}</small>
                     </div>
 
-                    <div 
-                      className="resize-handle resize-handle-bottom" 
-                      onMouseDown={(e) => handleResizeStart(e, event.id, 'bottom')} 
-                      onTouchStart={(e) => handleResizeStart(e, event.id, 'bottom')}
-                    />
+                    {!isLocked && (
+                      <div 
+                        className="resize-handle resize-handle-bottom" 
+                        onMouseDown={(e) => handleResizeStart(e, event.id, 'bottom')} 
+                        onTouchStart={(e) => handleResizeStart(e, event.id, 'bottom')}
+                      />
+                    )}
                   </div>
                 );
               })}
