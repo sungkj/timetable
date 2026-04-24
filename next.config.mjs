@@ -5,6 +5,7 @@ const withPWAConfig = withPWA({
   disable: process.env.NODE_ENV === "development", // 개발 모드에서는 PWA 캐싱 비활성화 (선택 사항)
   register: true,
   skipWaiting: true,
+  cacheStartUrl: true,
 });
 
 /** @type {import('next').NextConfig} */
