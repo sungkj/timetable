@@ -56,6 +56,8 @@ body {
   flex-direction: column;
   flex-grow: 1;
   overflow: hidden;
+  user-select: none; /* 드래그 시 텍스트 선택 방지 */
+  -webkit-user-select: none; /* Safari 지원 */
 }
 
 /* 플로팅 메뉴 버튼 그룹 */

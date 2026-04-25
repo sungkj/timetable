@@ -235,12 +235,29 @@ export default function TimetablePage() {
 
     // 각 일정 아이템별로 개별 Draggable 생성
     gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
+      let dragAllowed = false;
+      let pressTimer: ReturnType<typeof setTimeout>;
+
       const d = Draggable.create(el, {
         type: "x,y",
         bounds: ".timetable-grid",
         edgeResistance: 0.65,
         allowNativeTouchScrolling: true, // 터치 스크롤 허용
         trigger: el.querySelector(".event-info"), // 현재 요소 내부의 정보 영역만 트리거로 지정
+        onPress: function() {
+          if (isLockedRef.current) return;
+          dragAllowed = false;
+          pressTimer = setTimeout(() => {
+            dragAllowed = true;
+            // 길게 눌렀음을 나타내는 시각적 힌트 (살짝 커지고 그림자 강조)
+            gsap.to(el, { scale: 1.03, boxShadow: "0 6px 12px rgba(0,0,0,0.2)", duration: 0.15 });
+          }, 400); // 400ms(0.4초) 누르고 있어야 드래그 활성화
+        },
+        onRelease: function() {
+          clearTimeout(pressTimer);
+          // 뗐을 때 확대 및 그림자 효과 원상 복구
+          gsap.to(el, { clearProps: "boxShadow,scale", duration: 0.15 });
+        },
         onClick: function() {
           if (isLockedRef.current) return; // 잠금 상태면 클릭 무시
           const id = (this.target as HTMLElement).getAttribute("data-id");
@@ -249,7 +266,12 @@ export default function TimetablePage() {
             setMenuData({ id, x: this.pointerX, y: this.pointerY });
           }
         },
-        onDragStart: function() {
+        onDragStart: function(e) {
+          if (isLockedRef.current || !dragAllowed) {
+            clearTimeout(pressTimer); // 400ms 이전에 드래그(스크롤) 시도 시 타이머 해제
+            this.endDrag(e); // 드래그 기능 취소 -> 스크롤 등으로 동작
+            return;
+          }
           gsap.set(this.target, { opacity: 0.8, zIndex: 100, cursor: "grabbing" });
         },
         onDragEnd: function() {
@@ -282,7 +304,7 @@ export default function TimetablePage() {
             }));
           }
           // 원래 위치로 되돌리기 (기존 로직 유지)
-          gsap.set(this.target, { x: 0, y: 0, zIndex: 2, cursor: "grab", opacity: 1 });
+          gsap.set(this.target, { x: 0, y: 0, zIndex: 2, cursor: "grab", opacity: 1, clearProps: "boxShadow,scale" });
         }
       })[0];
       
