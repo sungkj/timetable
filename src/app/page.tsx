@@ -521,6 +521,21 @@ export default function TimetablePage() {
   const currentDayIndex = now ? (now.getDay() === 0 ? 6 : now.getDay() - 1) : -1;
   const currentTop = now ? calculatePosition(`${now.getHours()}:${now.getMinutes()}`) : -1;
 
+  // 현재 진행 중인 일정의 남은 시간 계산 (분 단위)
+  const currentMinutes = now ? now.getHours() * 60 + now.getMinutes() : -1;
+  let remainingMinutes = -1;
+  if (currentDayIndex !== -1 && currentMinutes !== -1) {
+    const ongoingEvent = events.find(
+      (e) =>
+        e.day === currentDayIndex &&
+        timeToMinutes(e.startTime) <= currentMinutes &&
+        timeToMinutes(e.endTime) > currentMinutes
+    );
+    if (ongoingEvent) {
+      remainingMinutes = timeToMinutes(ongoingEvent.endTime) - currentMinutes;
+    }
+  }
+
   return (
     <main className="timetable-container">
       {/* 보기 모드 배지 (우측 상단 고정) */}
@@ -597,7 +612,27 @@ export default function TimetablePage() {
                   ))}
                 </div>
               ))}
-              {dayIndex === currentDayIndex && currentTop >= 0 && currentTop <= 100 && <div className="current-time-indicator" style={{ top: `${currentTop}%` }} />}
+              {dayIndex === currentDayIndex && currentTop >= 0 && currentTop <= 100 && (
+                <div className="current-time-indicator" style={{ top: `${currentTop}%`, zIndex: 150 }}>
+                  {remainingMinutes > 0 && remainingMinutes <= 60 && (
+                    <span style={{
+                      position: "absolute",
+                      right: "100%", // 텍스트의 오른쪽 끝을 빨간 라인의 왼쪽 끝에 맞춤
+                      marginRight: "2px", // 빨간 라인과 글자 사이의 간격
+                      bottom: "-4px",
+                      fontSize: "8px",
+                      fontWeight: "bold",
+                      color: "red",
+                      backgroundColor: "rgba(255, 255, 255, 0.7)", // 흐려짐 방지를 위해 불투명도 증가
+                      padding: "0px 0px",
+                      borderRadius: "1px",
+                      whiteSpace: "nowrap"
+                    }}>
+                      {remainingMinutes}
+                    </span>
+                  )}
+                </div>
+              )}
               {events.filter(e => e.day === dayIndex).map(event => {
                 const topPct = calculatePosition(event.startTime);
                 const bottomPct = calculatePosition(event.endTime);
