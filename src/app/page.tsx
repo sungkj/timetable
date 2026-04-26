@@ -251,7 +251,7 @@ export default function TimetablePage() {
           pressTimer = setTimeout(() => {
             isLongPressed = true;
             gsap.to(this.target, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
-          }, 300);
+          }, 250);
         },
         onRelease: function() {
           clearTimeout(pressTimer);
