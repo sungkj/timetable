@@ -235,14 +235,34 @@ export default function TimetablePage() {
 
     // 각 일정 아이템별로 개별 Draggable 생성
     gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
+      let pressTimer: ReturnType<typeof setTimeout>;
+      let isLongPressed = false;
+
       const d = Draggable.create(el, {
         type: "x,y",
         bounds: ".timetable-grid",
         edgeResistance: 0.65,
         allowNativeTouchScrolling: true, // 터치 스크롤 허용
         trigger: el.querySelector(".event-info"), // 현재 요소 내부의 정보 영역만 트리거로 지정
+        onPress: function() {
+          if (isLockedRef.current) return;
+          isLongPressed = false;
+          // 300ms 딜레이 후 드래그 활성화 및 시각적 피드백
+          pressTimer = setTimeout(() => {
+            isLongPressed = true;
+            gsap.to(this.target, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
+          }, 300);
+        },
+        onRelease: function() {
+          clearTimeout(pressTimer);
+          if (isLongPressed) {
+            // 드래그를 하지 않고 손을 뗐을 때 원상 복구
+            gsap.to(this.target, { scale: 1, boxShadow: "0 2px 4px rgba(0,0,0,0.1)", zIndex: 2, duration: 0.2, clearProps: "scale,boxShadow" });
+          }
+        },
         onClick: function() {
           if (isLockedRef.current) return; // 잠금 상태면 클릭 무시
+          if (isLongPressed) return; // 길게 누른 상태에서 뗀 경우 메뉴 무시
           const id = (this.target as HTMLElement).getAttribute("data-id");
           if (id) {
             // GSAP Draggable 인스턴스의 pointerX, pointerY를 사용하여 터치 위치 확보
@@ -250,9 +270,15 @@ export default function TimetablePage() {
           }
         },
         onDragStart: function() {
+          if (!isLongPressed) {
+            clearTimeout(pressTimer);
+            this.endDrag(); // 길게 누르기 전에 움직이면 드래그 취소 (터치 스크롤 허용)
+            return;
+          }
           gsap.set(this.target, { opacity: 0.8, zIndex: 100, cursor: "grabbing" });
         },
         onDragEnd: function() {
+          if (!isLongPressed) return;
           if (!gridRef.current) return;
           const gridRect = gridRef.current.getBoundingClientRect();
           const itemRect = this.target.getBoundingClientRect();
@@ -282,7 +308,7 @@ export default function TimetablePage() {
             }));
           }
           // 원래 위치로 되돌리기 (기존 로직 유지)
-          gsap.set(this.target, { x: 0, y: 0, zIndex: 2, cursor: "grab", opacity: 1 });
+          gsap.set(this.target, { x: 0, y: 0, zIndex: 2, cursor: "grab", opacity: 1, clearProps: "scale,boxShadow" });
         }
       })[0];
       
