@@ -30,6 +30,12 @@
 
 * {
   box-sizing: border-box;
+  -webkit-touch-callout: none; /* 모바일 기기 길게 누르기 팝업 방지 */
+  -webkit-user-select: none;   /* Safari 텍스트 선택 방지 */
+  -webkit-user-drag: none;     /* 브라우저 자체 드래그 동작 방지 */
+  -moz-user-select: none;      /* Firefox 텍스트 선택 방지 */
+  -ms-user-select: none;       /* IE/Edge 텍스트 선택 방지 */
+  user-select: none;           /* 표준 텍스트 선택 방지 */
 }
 
 body {
@@ -39,6 +45,14 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   overflow: hidden;
+}
+
+input, textarea, select {
+  -webkit-touch-callout: default;
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
+  user-select: auto;
 }
 
 .timetable-container {
@@ -56,6 +70,8 @@ body {
   flex-direction: column;
   flex-grow: 1;
   overflow: hidden;
+  user-select: none; /* 드래그 시 텍스트 선택 방지 */
+  -webkit-user-select: none; /* Safari 지원 */
 }
 
 /* 플로팅 메뉴 버튼 그룹 */

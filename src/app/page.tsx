@@ -625,7 +625,7 @@ export default function TimetablePage() {
                       color: "red",
                       backgroundColor: "rgba(255, 255, 255, 0.7)", // 흐려짐 방지를 위해 불투명도 증가
                       padding: "0px 0px",
-                      borderRadius: "1px",
+                      borderRadius: "2px",
                       whiteSpace: "nowrap"
                     }}>
                       {remainingMinutes}
