@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { flushSync } from "react-dom";
 import { gsap } from "gsap";
 import { Draggable } from "gsap/Draggable";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(Draggable);
 }
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 const START_HOUR = 8;
@@ -122,7 +125,7 @@ export default function TimetablePage() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (isLoaded) {
       localStorage.setItem("my-timetable-events", JSON.stringify(events));
       initDraggables();
@@ -229,24 +232,26 @@ export default function TimetablePage() {
     
     // 기존 인스턴스 모두 제거
     gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
+      gsap.killTweensOf(el); // 충돌을 일으키는 진행 중인 모든 GSAP 애니메이션 강제 종료
       const d = Draggable.get(el);
       if (d) d.kill();
+      gsap.set(el, { clearProps: "x,y,transform,scale,boxShadow,zIndex,opacity" });
     });
 
     // 각 일정 아이템별로 개별 Draggable 생성
     gsap.utils.toArray<HTMLElement>(".event-item").forEach(el => {
       let pressTimer: ReturnType<typeof setTimeout>;
       let isLongPressed = false;
+      let didDrag = false; // 드래그가 실제로 일어났는지 추적
 
       const d = Draggable.create(el, {
         type: "x,y",
-        bounds: ".timetable-grid",
-        edgeResistance: 0.65,
         allowNativeTouchScrolling: true, // 터치 스크롤 허용
         trigger: el.querySelector(".event-info"), // 현재 요소 내부의 정보 영역만 트리거로 지정
         onPress: function() {
           if (isLockedRef.current) return;
           isLongPressed = false;
+          didDrag = false;
           // 300ms 딜레이 후 드래그 활성화 및 시각적 피드백
           pressTimer = setTimeout(() => {
             isLongPressed = true;
@@ -255,8 +260,8 @@ export default function TimetablePage() {
         },
         onRelease: function() {
           clearTimeout(pressTimer);
-          if (isLongPressed) {
-            // 드래그를 하지 않고 손을 뗐을 때 원상 복구
+          if (isLongPressed && !didDrag) {
+            // 제자리에서 길게 누르기만 하고 드래그하지 않았을 때만 원상 복구 애니메이션 실행
             gsap.to(this.target, { scale: 1, boxShadow: "0 2px 4px rgba(0,0,0,0.1)", zIndex: 2, duration: 0.2, clearProps: "scale,boxShadow" });
           }
         },
@@ -275,7 +280,9 @@ export default function TimetablePage() {
             this.endDrag(); // 길게 누르기 전에 움직이면 드래그 취소 (터치 스크롤 허용)
             return;
           }
-          gsap.set(this.target, { opacity: 0.8, zIndex: 100, cursor: "grabbing" });
+          didDrag = true;
+          gsap.killTweensOf(this.target); // 드래그 중 다른 애니메이션 간섭 차단
+          gsap.set(this.target, { opacity: 0.8, scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, cursor: "grabbing" });
         },
         onDragEnd: function() {
           if (!isLongPressed) return;
@@ -291,24 +298,45 @@ export default function TimetablePage() {
 
           const relativeY = itemRect.top - gridRect.top;
           const totalMinutes = (END_HOUR - START_HOUR + 1) * 60;
-          const totalHeight = gridRect.height;
+          // 테두리 두께 등에 의한 오차를 줄이기 위해 clientHeight를 우선 사용합니다.
+          const totalHeight = gridRef.current.clientHeight || gridRect.height;
           const minutesPerPixel = totalMinutes / totalHeight;
           let newStartMinutes = Math.round((relativeY * minutesPerPixel) / 10) * 10 + (START_HOUR * 60);
           
           const eventId = (this.target as HTMLElement).getAttribute("data-id");
-          if (eventId) {
+          const currentEvent = eventsRef.current.find(ev => ev.id === eventId);
+          
+          if (currentEvent && eventId) {
+            const originalStartMins = timeToMinutes(currentEvent.startTime);
+            const duration = timeToMinutes(currentEvent.endTime) - originalStartMins;
+            
+            // 화면 최하단으로 드래그 시 박스 길이가 줄어들거나 튕기는 현상을 막기 위해 범위를 제한합니다.
+            if (newStartMinutes < START_HOUR * 60) newStartMinutes = START_HOUR * 60;
+            if (newStartMinutes + duration > (END_HOUR + 1) * 60) {
+              newStartMinutes = (END_HOUR + 1) * 60 - duration;
+            }
+
+            const newST = minutesToTimeStr(newStartMinutes);
+            const newET = minutesToTimeStr(newStartMinutes + duration);
+
+            // [해결 핵심] GSAP의 튕김 현상을 근본적으로 차단하기 위해, 드래그가 끝난 즉시 계산된 진짜 목적지로 박스를 0ms 만에 꽂아버립니다.
+            const topPct = ((newStartMinutes - START_HOUR * 60) / totalMinutes) * 100;
+            const heightPct = (duration / totalMinutes) * 100;
+
+            gsap.set(this.target, { 
+              clearProps: "x,y,transform,scale,boxShadow,zIndex,opacity",
+              top: `${topPct}%`,
+              height: `${heightPct}%`
+            });
+
+            // 이후 백그라운드에서 React 상태 업데이트가 안전하게 수행됩니다.
             setEvents(prev => prev.map(ev => {
               if (ev.id === eventId) {
-                const duration = timeToMinutes(ev.endTime) - timeToMinutes(ev.startTime);
-                const newST = minutesToTimeStr(newStartMinutes);
-                const newET = minutesToTimeStr(Math.min(newStartMinutes + duration, (END_HOUR + 1) * 60 - 1));
                 return { ...ev, day: newDay, startTime: newST, endTime: newET };
               }
               return ev;
             }));
           }
-          // 원래 위치로 되돌리기 (기존 로직 유지)
-          gsap.set(this.target, { x: 0, y: 0, zIndex: 2, cursor: "grab", opacity: 1, clearProps: "scale,boxShadow" });
         }
       })[0];
       
