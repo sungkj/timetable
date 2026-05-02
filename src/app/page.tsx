@@ -354,6 +354,9 @@ export default function TimetablePage() {
     let isLongPressed = false;
     let didDrag = false;
 
+    // 핸들을 터치한 정확한 초기 위치 캡처 (손가락을 댄 위치에 따른 오차 방지)
+    const startClientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+
     const gridRect = gridRef.current.getBoundingClientRect();
     const totalMinutes = (END_HOUR - START_HOUR + 1) * 60;
     const totalHeight = gridRef.current.clientHeight || gridRect.height;
@@ -406,14 +409,14 @@ export default function TimetablePage() {
 
       if (!gridRef.current) return;
       const clientY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
-      const relativeY = clientY - gridRect.top + gridRef.current.scrollTop;
-      let currentMinutes = Math.round((relativeY / pixelsPerMinute) / 10) * 10 + (START_HOUR * 60);
+      const deltaY = clientY - startClientY;
+      const deltaMins = Math.round((deltaY / pixelsPerMinute) / 10) * 10;
       
       if (type === 'top') {
-        tempStartMins = Math.max(START_HOUR * 60, Math.min(currentMinutes, originalEndMins - 10));
+        tempStartMins = Math.max(START_HOUR * 60, Math.min(originalStartMins + deltaMins, originalEndMins - 10));
         tempEndMins = originalEndMins;
       } else {
-        tempEndMins = Math.min((END_HOUR + 1) * 60 - 1, Math.max(currentMinutes, originalStartMins + 10));
+        tempEndMins = Math.min((END_HOUR + 1) * 60, Math.max(originalEndMins + deltaMins, originalStartMins + 10));
         tempStartMins = originalStartMins;
       }
 
