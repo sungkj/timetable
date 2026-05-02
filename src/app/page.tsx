@@ -49,6 +49,7 @@ export default function TimetablePage() {
   
   const gridRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<TimetableEvent[]>([]);
+  const resizeGuideRef = useRef<HTMLDivElement>(null);
   
   const [newTitle, setNewTitle] = useState("");
   const [newDay, setNewDay] = useState(0);
@@ -353,11 +354,6 @@ export default function TimetablePage() {
     let isLongPressed = false;
     let didDrag = false;
 
-    const timer = setTimeout(() => {
-      isLongPressed = true;
-      gsap.to(targetItem, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
-    }, 400);
-
     const gridRect = gridRef.current.getBoundingClientRect();
     const totalMinutes = (END_HOUR - START_HOUR + 1) * 60;
     const totalHeight = gridRef.current.clientHeight || gridRect.height;
@@ -365,7 +361,6 @@ export default function TimetablePage() {
 
     const currentEvent = eventsRef.current.find(ev => ev.id === eventId);
     if (!currentEvent) {
-      clearTimeout(timer);
       return;
     }
 
@@ -374,6 +369,19 @@ export default function TimetablePage() {
     
     let tempStartMins = originalStartMins;
     let tempEndMins = originalEndMins;
+
+    const timer = setTimeout(() => {
+      isLongPressed = true;
+      gsap.to(targetItem, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
+      
+      if (resizeGuideRef.current) {
+        const edgeMins = type === 'top' ? tempStartMins : tempEndMins;
+        const edgePct = ((edgeMins - START_HOUR * 60) / totalMinutes) * 100;
+        gsap.set(resizeGuideRef.current, { display: "block", top: `${edgePct}%` });
+        const timeSpan = resizeGuideRef.current.querySelector('span');
+        if (timeSpan) timeSpan.innerText = format12h(minutesToTimeStr(edgeMins));
+      }
+    }, 400);
 
     const dInstance = Draggable.get(targetItem);
 
@@ -414,6 +422,14 @@ export default function TimetablePage() {
       
       gsap.set(targetItem, { top: `${topPct}%`, height: `${heightPct}%` });
 
+      if (resizeGuideRef.current) {
+        const edgeMins = type === 'top' ? tempStartMins : tempEndMins;
+        const edgePct = ((edgeMins - START_HOUR * 60) / totalMinutes) * 100;
+        gsap.set(resizeGuideRef.current, { top: `${edgePct}%` });
+        const timeSpan = resizeGuideRef.current.querySelector('span');
+        if (timeSpan) timeSpan.innerText = format12h(minutesToTimeStr(edgeMins));
+      }
+
       const timeSmall = targetItem.querySelector('small');
       if (timeSmall) {
         timeSmall.innerText = `${format12h(minutesToTimeStr(tempStartMins))}-${format12h(minutesToTimeStr(tempEndMins))}`;
@@ -422,6 +438,9 @@ export default function TimetablePage() {
 
     const onEnd = () => {
       clearTimeout(timer);
+      if (resizeGuideRef.current) {
+        gsap.set(resizeGuideRef.current, { display: "none" });
+      }
       window.removeEventListener('mousemove', onMove as any);
       window.removeEventListener('mouseup', onEnd);
       window.removeEventListener('touchmove', onMove as any);
@@ -762,6 +781,34 @@ export default function TimetablePage() {
               })}
             </div>
           ))}
+
+          {/* 시간표 크기 조절 시 가려짐 방지를 위한 좌우 안내선 */}
+          <div 
+            ref={resizeGuideRef}
+            style={{
+              display: "none",
+              position: "absolute",
+              left: 0,
+              right: 0,
+              height: "0",
+              borderTop: "2px dashed rgba(33, 150, 243, 0.5)",
+              zIndex: 200,
+              pointerEvents: "none"
+            }}
+          >
+            <span style={{
+              position: "absolute",
+              left: "4px",
+              bottom: "2px",
+              fontSize: "11px",
+              fontWeight: "bold",
+              color: "var(--primary-color, #2196f3)",
+              backgroundColor: "var(--background, #fff)",
+              padding: "1px 4px",
+              borderRadius: "4px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+            }}></span>
+          </div>
         </div>
       </div>
 
