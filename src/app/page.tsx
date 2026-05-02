@@ -256,7 +256,7 @@ export default function TimetablePage() {
           pressTimer = setTimeout(() => {
             isLongPressed = true;
             gsap.to(this.target, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
-          }, 250);
+          }, 400);
         },
         onRelease: function() {
           clearTimeout(pressTimer);
@@ -350,19 +350,24 @@ export default function TimetablePage() {
     const targetItem = (e.currentTarget as HTMLElement).parentElement;
     if (!targetItem || !gridRef.current) return;
 
-    // Draggable 비활성화
-    const dInstance = Draggable.get(targetItem);
-    if (dInstance) dInstance.disable();
+    let isLongPressed = false;
+    let didDrag = false;
 
-    gsap.set(targetItem, { clearProps: "transform", zIndex: 100 });
+    const timer = setTimeout(() => {
+      isLongPressed = true;
+      gsap.to(targetItem, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
+    }, 400);
 
     const gridRect = gridRef.current.getBoundingClientRect();
     const totalMinutes = (END_HOUR - START_HOUR + 1) * 60;
-    const totalHeight = gridRef.current.scrollHeight || gridRect.height;
+    const totalHeight = gridRef.current.clientHeight || gridRect.height;
     const pixelsPerMinute = totalHeight / totalMinutes;
 
     const currentEvent = eventsRef.current.find(ev => ev.id === eventId);
-    if (!currentEvent) return;
+    if (!currentEvent) {
+      clearTimeout(timer);
+      return;
+    }
 
     const originalStartMins = timeToMinutes(currentEvent.startTime);
     const originalEndMins = timeToMinutes(currentEvent.endTime);
@@ -370,7 +375,27 @@ export default function TimetablePage() {
     let tempStartMins = originalStartMins;
     let tempEndMins = originalEndMins;
 
+    const dInstance = Draggable.get(targetItem);
+
     const onMove = (moveEvent: MouseEvent | TouchEvent) => {
+      if (!isLongPressed) {
+        clearTimeout(timer);
+        onEnd(); // 드래그 취소 (터치 스크롤 허용)
+        return;
+      }
+
+      // 롱프레스 후 드래그 시 브라우저 스크롤 방지
+      if (moveEvent.cancelable) {
+        moveEvent.preventDefault();
+      }
+
+      if (!didDrag) {
+        didDrag = true;
+        if (dInstance) dInstance.disable();
+        gsap.killTweensOf(targetItem);
+        gsap.set(targetItem, { opacity: 0.8, scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100 });
+      }
+
       if (!gridRef.current) return;
       const clientY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
       const relativeY = clientY - gridRect.top + gridRef.current.scrollTop;
@@ -396,20 +421,28 @@ export default function TimetablePage() {
     };
 
     const onEnd = () => {
+      clearTimeout(timer);
       window.removeEventListener('mousemove', onMove as any);
       window.removeEventListener('mouseup', onEnd);
       window.removeEventListener('touchmove', onMove as any);
       window.removeEventListener('touchend', onEnd);
       
-      if (dInstance) dInstance.enable();
-      
-      setEvents(prev => prev.map(ev => 
-        ev.id === eventId ? { 
-          ...ev, 
-          startTime: minutesToTimeStr(tempStartMins), 
-          endTime: minutesToTimeStr(tempEndMins) 
-        } : ev
-      ));
+      if (isLongPressed && !didDrag) {
+        gsap.to(targetItem, { scale: 1, boxShadow: "0 2px 4px rgba(0,0,0,0.1)", zIndex: 2, duration: 0.2, clearProps: "scale,boxShadow" });
+      }
+
+      if (didDrag) {
+        gsap.set(targetItem, { clearProps: "transform,scale,boxShadow,zIndex,opacity", zIndex: 2 });
+        if (dInstance) dInstance.enable();
+        
+        setEvents(prev => prev.map(ev => 
+          ev.id === eventId ? { 
+            ...ev, 
+            startTime: minutesToTimeStr(tempStartMins), 
+            endTime: minutesToTimeStr(tempEndMins) 
+          } : ev
+        ));
+      }
     };
 
     window.addEventListener('mousemove', onMove as any);
