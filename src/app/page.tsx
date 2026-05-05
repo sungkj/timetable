@@ -236,7 +236,7 @@ export default function TimetablePage() {
       gsap.killTweensOf(el); // 충돌을 일으키는 진행 중인 모든 GSAP 애니메이션 강제 종료
       const d = Draggable.get(el);
       if (d) d.kill();
-      gsap.set(el, { clearProps: "x,y,transform,scale,boxShadow,zIndex,opacity" });
+      gsap.set(el, { clearProps: "x,y,transform,boxShadow,zIndex,opacity" });
     });
 
     // 각 일정 아이템별로 개별 Draggable 생성
@@ -256,14 +256,14 @@ export default function TimetablePage() {
           // 300ms 딜레이 후 드래그 활성화 및 시각적 피드백
           pressTimer = setTimeout(() => {
             isLongPressed = true;
-            gsap.to(this.target, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
+            gsap.to(this.target, { boxShadow: "0 0 16px rgba(0,0,0,0.4)", zIndex: 100, duration: 0.2 });
           }, 400);
         },
         onRelease: function() {
           clearTimeout(pressTimer);
           if (isLongPressed && !didDrag) {
             // 제자리에서 길게 누르기만 하고 드래그하지 않았을 때만 원상 복구 애니메이션 실행
-            gsap.to(this.target, { scale: 1, boxShadow: "0 2px 4px rgba(0,0,0,0.1)", zIndex: 2, duration: 0.2, clearProps: "scale,boxShadow" });
+            gsap.to(this.target, { boxShadow: "0 2px 4px rgba(0,0,0,0.1)", zIndex: 2, duration: 0.2, clearProps: "boxShadow" });
           }
         },
         onClick: function() {
@@ -283,7 +283,7 @@ export default function TimetablePage() {
           }
           didDrag = true;
           gsap.killTweensOf(this.target); // 드래그 중 다른 애니메이션 간섭 차단
-          gsap.set(this.target, { opacity: 0.8, scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, cursor: "grabbing" });
+          gsap.set(this.target, { opacity: 0.8, boxShadow: "0 0 16px rgba(0,0,0,0.4)", zIndex: 100, cursor: "grabbing" });
         },
         onDragEnd: function() {
           if (!isLongPressed) return;
@@ -325,7 +325,7 @@ export default function TimetablePage() {
             const heightPct = (duration / totalMinutes) * 100;
 
             gsap.set(this.target, { 
-              clearProps: "x,y,transform,scale,boxShadow,zIndex,opacity",
+              clearProps: "x,y,transform,boxShadow,zIndex,opacity",
               top: `${topPct}%`,
               height: `${heightPct}%`
             });
@@ -375,7 +375,7 @@ export default function TimetablePage() {
 
     const timer = setTimeout(() => {
       isLongPressed = true;
-      gsap.to(targetItem, { scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100, duration: 0.2 });
+      gsap.to(targetItem, { boxShadow: "0 0 16px rgba(0,0,0,0.4)", zIndex: 100, duration: 0.2 });
       
       if (resizeGuideRef.current) {
         const edgeMins = type === 'top' ? tempStartMins : tempEndMins;
@@ -404,7 +404,7 @@ export default function TimetablePage() {
         didDrag = true;
         if (dInstance) dInstance.disable();
         gsap.killTweensOf(targetItem);
-        gsap.set(targetItem, { opacity: 0.8, scale: 1.02, boxShadow: "0 8px 16px rgba(0,0,0,0.3)", zIndex: 100 });
+        gsap.set(targetItem, { opacity: 0.8, boxShadow: "0 0 16px rgba(0,0,0,0.4)", zIndex: 100 });
       }
 
       if (!gridRef.current) return;
@@ -450,11 +450,11 @@ export default function TimetablePage() {
       window.removeEventListener('touchend', onEnd);
       
       if (isLongPressed && !didDrag) {
-        gsap.to(targetItem, { scale: 1, boxShadow: "0 2px 4px rgba(0,0,0,0.1)", zIndex: 2, duration: 0.2, clearProps: "scale,boxShadow" });
+        gsap.to(targetItem, { boxShadow: "0 2px 4px rgba(0,0,0,0.1)", zIndex: 2, duration: 0.2, clearProps: "boxShadow" });
       }
 
       if (didDrag) {
-        gsap.set(targetItem, { clearProps: "transform,scale,boxShadow,zIndex,opacity", zIndex: 2 });
+        gsap.set(targetItem, { clearProps: "transform,boxShadow,zIndex,opacity", zIndex: 2 });
         if (dInstance) dInstance.enable();
         
         setEvents(prev => prev.map(ev => 
