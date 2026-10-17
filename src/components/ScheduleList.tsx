@@ -37,6 +37,8 @@ export default function ScheduleList({ names, currentName, onSelect, onCreate, o
       timer: setTimeout(() => {
         longPressedRef.current = true;
         pressRef.current = null;
+        // 뗄 때 click이 오지 않는 브라우저가 있어, 시간이 차면 눌린 자리에서 바로 띄운다.
+        setMenu({ name, x: clientX, y: clientY });
       }, LONG_PRESS_MS),
     };
   };
@@ -51,10 +53,10 @@ export default function ScheduleList({ names, currentName, onSelect, onCreate, o
     }
   };
 
-  const handleClick = (e: React.MouseEvent, name: string) => {
-    if (longPressedRef.current) {
+  const handleClick = (name: string) => {
+    // 메뉴가 이미 떠 있으면 이 click은 길게 누르기의 잔여분이다. 선택으로 넘기지 않는다.
+    if (menu || longPressedRef.current) {
       longPressedRef.current = false;
-      setMenu({ name, x: e.clientX, y: e.clientY });
       return;
     }
     onSelect(name);
@@ -76,7 +78,7 @@ export default function ScheduleList({ names, currentName, onSelect, onCreate, o
               onPointerUp={cancelPress}
               onPointerLeave={cancelPress}
               onPointerCancel={cancelPress}
-              onClick={(e) => handleClick(e, name)}
+              onClick={() => handleClick(name)}
             >
               {name}
               {name === currentName && <span className="timetable-list-badge">사용 중</span>}
