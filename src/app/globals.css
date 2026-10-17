@@ -271,7 +271,7 @@ input, textarea, select {
   background: var(--label-bg);
 }
 
-.timetable-list-item.active {
+.timetable-list-item[data-active="true"] {
   border-color: var(--primary-color);
   background: var(--label-bg);
   font-weight: bold;
@@ -300,6 +300,82 @@ input, textarea, select {
   padding-bottom: 8px;
   background-color: var(--header-bg);
   font-size: 0.8rem;
+}
+
+/* 시간 라벨 열 위의 빈 칸 (요일 헤더와 열을 맞추기 위한 자리) */
+.time-label-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.day-header.today {
+  color: var(--current-time-line);
+}
+
+.today-dot {
+  font-size: 0.45rem;
+}
+
+/* 보기 모드 배지 (우측 상단 고정) */
+.lock-badge {
+  position: fixed;
+  top: 10px;
+  right: 12px;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 6px;
+  border-radius: 20px;
+  font-size: 7px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* 현재 시각선 위에 뜨는 남은 시간 (분) */
+.remaining-minutes {
+  position: absolute;
+  right: 100%; /* 텍스트의 오른쪽 끝을 빨간 라인의 왼쪽 끝에 맞춤 */
+  bottom: -4px;
+  margin-right: 2px; /* 빨간 라인과 글자 사이의 간격 */
+  font-size: 8px;
+  font-weight: bold;
+  color: var(--current-time-line);
+  background-color: var(--background);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* 리사이즈 중 가장자리 위치를 보여주는 좌우 안내선 */
+.resize-guide {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed rgba(33, 150, 243, 0.5);
+  z-index: 200;
+  pointer-events: none;
+}
+
+.resize-guide span {
+  position: absolute;
+  left: 4px;
+  bottom: 2px;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--primary-color);
+  background-color: var(--background);
+  padding: 1px 4px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .timetable-grid {
@@ -432,7 +508,7 @@ input, textarea, select {
   right: 0;
   height: 2px;
   background-color: var(--current-time-line);
-  z-index: 10;
+  z-index: 150; /* 일정 박스(z-index 2)보다 위에 그린다 */
   pointer-events: none;
 }
 
@@ -453,6 +529,11 @@ input, textarea, select {
 }
 
 .color-preset-btn:hover {
+  transform: scale(1.1);
+}
+
+.color-preset-btn[data-active="true"] {
+  border-color: var(--foreground);
   transform: scale(1.1);
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { sanitizeName } from "../../../lib/name.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +8,6 @@ export const dynamic = "force-dynamic";
 // 제목이 키이므로 같은 이름의 시간표는 구조적으로 존재할 수 없다.
 const KEY = "timetables";
 const MAX_EVENTS = 500;
-const MAX_NAME_LENGTH = 50;
 
 let client: Redis | null = null;
 
@@ -62,15 +62,6 @@ function sanitizeEvents(input: unknown): StoredEvent[] | null {
     });
   }
   return out;
-}
-
-function sanitizeName(input: unknown): string | null {
-  if (typeof input !== "string") return null;
-  const name = input.trim();
-  if (!name || name.length > MAX_NAME_LENGTH) return null;
-  // 제어문자 차단 (개행 등)
-  if (/[\u0000-\u001f\u007f]/.test(name)) return null;
-  return name;
 }
 
 async function readBody(req: NextRequest): Promise<Record<string, unknown>> {
