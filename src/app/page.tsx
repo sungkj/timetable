@@ -894,10 +894,12 @@ export default function TimetablePage() {
 
       <h1 className="timetable-main-title" onClick={() => { refreshNameList(); setIsListOpen(true); setIsMenuOpen(false); }}>
         {timetableTitle}
-        <span className="save-status">
-          {saveStatus === "saving" ? "저장 중…" : saveStatus === "error" ? "저장 실패" : "저장됨"}
-          {" · "}목록 ▾
-        </span>
+        <span className="list-caret">▾</span>
+        {saveStatus !== "saved" && (
+          <span className="save-status">
+            {saveStatus === "saving" ? "저장 중…" : "저장 실패"}
+          </span>
+        )}
       </h1>
 
       {/* 플로팅 메뉴 버튼 */}
