@@ -21,11 +21,13 @@ import { encodeShareData, decodeLegacyShare } from "../lib/share";
 import {
   ApiError,
   createTimetable,
+  deleteTimetable,
   fetchNames,
   fetchTimetable,
   putTimetable,
   renameTimetable,
 } from "../lib/api";
+import { clearPendingSave, readPendingSave } from "../lib/pendingSave";
 import type { TimetableEvent } from "../lib/types";
 import { useAutoSave } from "../hooks/useAutoSave";
 import { useEventResize } from "../hooks/useEventResize";
@@ -312,6 +314,41 @@ export default function TimetablePage() {
     setEvents([]);
   };
 
+  // 시간표 하나를 서버에서 제거한다. 지금 보던 것을 지우면 남은 것 중 최근 것을 연다.
+  const handleDeleteTimetable = async (name: string) => {
+    if (!confirm(`"${name}" 시간표를 제거하시겠습니까?\n안의 일정도 함께 사라지고 되돌릴 수 없습니다.`)) return;
+
+    try {
+      await deleteTimetable(name);
+    } catch (err) {
+      return alert(err instanceof ApiError ? err.message : "서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.");
+    }
+
+    // 지운 시간표를 서버에 되살릴 수 있는 밀린 저장이 남아 있으면 함께 지운다.
+    if (readPendingSave()?.name === name) clearPendingSave();
+
+    let remaining = await refreshNameList();
+
+    if (name !== timetableTitle) return;
+
+    // 남은 시간표가 없으면 새 빈 시간표를 하나 만들어 둔다.
+    if (remaining.length === 0) {
+      try {
+        await createTimetable(DEFAULT_TIMETABLE_NAME);
+        remaining = await refreshNameList();
+      } catch {
+        // 서버에 못 닿아도 빈 화면으로 계속 쓴다
+      }
+    }
+
+    const next = remaining[0] ?? DEFAULT_TIMETABLE_NAME;
+    const list = remaining.length > 0 ? await fetchTimetable(next) : null;
+    setIsListOpen(false);
+    skipNextSaveRef.current = true; // 불러온 내용을 곧바로 되쓰지 않는다
+    setEvents(list ?? []);
+    setTimetableTitle(next);
+  };
+
   // 잠금 상태 토글 함수
   const toggleLock = () => {
     const nextLocked = !isLocked;
@@ -505,6 +542,7 @@ export default function TimetablePage() {
           currentName={timetableTitle}
           onSelect={switchTimetable}
           onCreate={handleCreateTimetable}
+          onDelete={handleDeleteTimetable}
           onClose={() => setIsListOpen(false)}
         />
       )}

@@ -141,6 +141,20 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ name, savedAt: Date.now() });
 }
 
+// DELETE /api/timetables?name=수업  → 시간표 삭제. 없으면 404.
+export async function DELETE(req: NextRequest) {
+  const redis = getRedis();
+  if (!redis) return noRedis();
+
+  const name = sanitizeName(req.nextUrl.searchParams.get("name"));
+  if (!name) return NextResponse.json({ error: "시간표 이름이 올바르지 않습니다." }, { status: 400 });
+
+  const removed = await redis.hdel(KEY, name);
+  if (!removed) return NextResponse.json({ error: "없는 시간표입니다." }, { status: 404 });
+
+  return NextResponse.json({ name });
+}
+
 // PATCH /api/timetables { from, to }  → 제목 변경. 대상 이름이 이미 있으면 409.
 export async function PATCH(req: NextRequest) {
   const redis = getRedis();

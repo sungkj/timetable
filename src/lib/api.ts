@@ -56,6 +56,12 @@ export async function renameTimetable(from: string, to: string): Promise<void> {
   if (!res.ok) throw new ApiError(await readError(res, "제목을 변경하지 못했습니다."));
 }
 
+// 시간표 삭제.
+export async function deleteTimetable(name: string): Promise<void> {
+  const res = await fetch(`${ENDPOINT}?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+  if (!res.ok) throw new ApiError(await readError(res, "시간표를 제거하지 못했습니다."));
+}
+
 // 서버가 보낸 한국어 오류 메시지를 그대로 쓰고, 없으면 기본 문구로 대체한다.
 async function readError(res: Response, fallback: string): Promise<string> {
   try {
