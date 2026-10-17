@@ -98,7 +98,12 @@ export default function ScheduleList({ names, currentName, onSelect, onCreate, o
               top: Math.min(menu.y, window.innerHeight - MENU_HEIGHT),
             }}
           >
-            <button className="event-menu-item delete" onClick={() => onDelete(menu.name)}>제거</button>
+            <button
+              className="event-menu-item delete"
+              onClick={(e) => { e.stopPropagation(); setMenu(null); onDelete(menu.name); }}
+            >
+              제거
+            </button>
           </div>
         </div>
       )}
