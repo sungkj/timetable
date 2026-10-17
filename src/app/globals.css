@@ -234,14 +234,6 @@ input, textarea, select {
   opacity: 0.7;
 }
 
-.save-status {
-  display: block;
-  font-size: 0.55rem;
-  font-weight: normal;
-  color: var(--label-color);
-  opacity: 0.8;
-}
-
 /* 시간표 목록 모달 */
 .timetable-list {
   display: flex;

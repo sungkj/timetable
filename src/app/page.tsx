@@ -32,7 +32,6 @@ import { useEventResize } from "../hooks/useEventResize";
 import EventContextMenu from "../components/EventContextMenu";
 import FabMenu from "../components/FabMenu";
 import LockBadge from "../components/LockBadge";
-import SaveStatus from "../components/SaveStatus";
 import ScheduleForm from "../components/ScheduleForm";
 import ScheduleList from "../components/ScheduleList";
 import TimetableGrid from "../components/TimetableGrid";
@@ -75,7 +74,7 @@ export default function TimetablePage() {
     titleRef.current = timetableTitle;
   }, [timetableTitle]);
 
-  const saveStatus = useAutoSave(events, { isLoadedRef, skipNextSaveRef, titleRef, eventsRef });
+  useAutoSave(events, { isLoadedRef, skipNextSaveRef, titleRef, eventsRef });
 
   // 서버 목록을 받아 state에 반영하고, 같은 목록을 호출부에도 돌려준다.
   // 서버에 닿지 못하면(null) 마지막으로 받아둔 목록을 그대로 두고 빈 배열을 돌려준다.
@@ -461,7 +460,6 @@ export default function TimetablePage() {
       <h1 className="timetable-main-title" onClick={() => { refreshNameList(); setIsListOpen(true); setIsMenuOpen(false); }}>
         {timetableTitle}
         <span className="list-caret">▾</span>
-        <SaveStatus status={saveStatus} />
       </h1>
 
       <FabMenu
