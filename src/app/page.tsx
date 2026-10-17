@@ -35,6 +35,66 @@ const PASTEL_COLORS = [
   { bg: "#efebe9", border: "#8d6e63", label: "갈색" },
 ];
 
+const LOCAL_EVENTS_KEY = "my-timetable-events";
+const LOCAL_TITLE_KEY = "my-timetable-title";
+const DEFAULT_TIMETABLE_NAME = "내 시간표";
+
+// 이미 쓰이는 이름이면 "이름 (2)" 형태로 비어 있는 이름을 찾는다.
+function freeName(base: string, taken: string[]): string {
+  if (!taken.includes(base)) return base;
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${base} (${i})`;
+    if (!taken.includes(candidate)) return candidate;
+  }
+  return `${base} ${Date.now()}`;
+}
+
+// 구버전 공유 링크(?data=) 디코딩. 형식: ID|D|START|END|TITLE|COLOR_IDX 를 * 로 이은 문자열
+function decodeLegacyShare(encoded: string): TimetableEvent[] | null {
+  try {
+    const decoded = decodeURIComponent(escape(atob(encoded)));
+    const imported = decoded.split("*").filter(Boolean).map(s => {
+      const [id, day, start, end, title, colorIdx] = s.split("|");
+      const fmtTime = (t: string) => `${t.substring(0, 2)}:${t.substring(2, 4)}`;
+      const cIdx = parseInt(colorIdx) || 0;
+      return {
+        id,
+        day: parseInt(day),
+        startTime: fmtTime(start),
+        endTime: fmtTime(end),
+        title,
+        color: JSON.stringify(PASTEL_COLORS[cIdx] || PASTEL_COLORS[0]),
+      };
+    });
+    return imported.length > 0 ? imported : null;
+  } catch {
+    return null;
+  }
+}
+
+function readLocalEvents(): TimetableEvent[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_EVENTS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function readLocalTitle(): string {
+  try {
+    return localStorage.getItem(LOCAL_TITLE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeLocalTitle(name: string) {
+  try {
+    localStorage.setItem(LOCAL_TITLE_KEY, name);
+  } catch {}
+}
+
 export default function TimetablePage() {
   const [now, setNow] = useState<Date | null>(null);
   const [events, setEvents] = useState<TimetableEvent[]>([]);
@@ -46,10 +106,18 @@ export default function TimetablePage() {
   const [isLocked, setIsLocked] = useState(true); // 기본값: 안전하게 잠금 상태로 시작
   const isLockedRef = useRef(true); // GSAP 콜백에서 최신 상태를 참조하기 위한 Ref
   const [timetableTitle, setTimetableTitle] = useState("시간표"); // 시간표 제목 상태
-  
+
+  const [isListOpen, setIsListOpen] = useState(false); // 시간표 목록 모달
+  const [timetableNames, setTimetableNames] = useState<string[]>([]);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+
   const gridRef = useRef<HTMLDivElement>(null);
   const eventsRef = useRef<TimetableEvent[]>([]);
   const resizeGuideRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef("시간표"); // 저장 요청이 최신 제목을 참조하도록
+  const isLoadedRef = useRef(false); // 로딩 전 빈 상태가 서버로 저장되는 것을 막는다
+  const skipNextSaveRef = useRef(false); // 시간표 전환 직후의 불필요한 재저장 방지
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const [newTitle, setNewTitle] = useState("");
   const [newDay, setNewDay] = useState(0);
@@ -62,78 +130,160 @@ export default function TimetablePage() {
   }, [events]);
 
   useEffect(() => {
-    setNow(new Date());
-    
-    const saved = localStorage.getItem("my-timetable-events");
-    let initialEvents: TimetableEvent[] = [];
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) initialEvents = parsed;
-      } catch (e) {}
-    }
+    titleRef.current = timetableTitle;
+  }, [timetableTitle]);
 
-    // URL에서 공유 데이터 확인 및 즉시 적용
-    const params = new URLSearchParams(window.location.search);
-    const sharedData = params.get("data");
-    const sharedTitle = params.get("title");
-
-    if (sharedData) {
-      try {
-        // 커스텀 포맷 디코딩: ID|D|START|END|TITLE|COLOR_IDX * ...
-        const decoded = decodeURIComponent(escape(atob(sharedData)));
-        const eventStrings = decoded.split("*");
-        
-        const importedEvents: TimetableEvent[] = eventStrings.filter(s => s).map(s => {
-          const [id, day, start, end, title, colorIdx] = s.split("|");
-          // 시간 복구 (0900 -> 09:00)
-          const fmtTime = (t: string) => `${t.substring(0, 2)}:${t.substring(2, 4)}`;
-          const cIdx = parseInt(colorIdx) || 0;
-          return {
-            id,
-            day: parseInt(day),
-            startTime: fmtTime(start),
-            endTime: fmtTime(end),
-            title,
-            color: JSON.stringify(PASTEL_COLORS[cIdx] || PASTEL_COLORS[0])
-          };
-        });
-
-        if (importedEvents.length > 0) {
-          if (confirm("공유받은 시간표 데이터가 있습니다. 현재 데이터를 덮어씌울까요?")) {
-            setEvents(importedEvents);
-            localStorage.setItem("my-timetable-events", JSON.stringify(importedEvents));
-            if (sharedTitle) {
-              setTimetableTitle(sharedTitle);
-              localStorage.setItem("my-timetable-title", sharedTitle);
-            }
-          }
-          window.history.replaceState({}, document.title, window.location.pathname);
-          setIsLoaded(true);
-          return;
-        }
-      } catch (e) {
-        console.error("데이터 임포트 실패", e);
+  // 서버에 저장된 시간표 목록을 가져온다. 최근 수정순이며 그대로 돌려준다.
+  const refreshNameList = async (): Promise<string[]> => {
+    try {
+      const res = await fetch("/api/timetables");
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (Array.isArray(data.names)) {
+        setTimetableNames(data.names);
+        return data.names;
       }
+    } catch {
+      // 오프라인이면 마지막으로 받아둔 목록을 그대로 둔다
     }
+    return [];
+  };
 
-    const savedTitle = localStorage.getItem("my-timetable-title");
-    if (savedTitle) setTimetableTitle(savedTitle);
+  // 현재 제목의 시간표를 서버에서 불러온다. 없으면 null.
+  const fetchTimetable = async (name: string): Promise<TimetableEvent[] | null> => {
+    const res = await fetch(`/api/timetables?name=${encodeURIComponent(name)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("load failed");
+    const data = await res.json();
+    return Array.isArray(data.events) ? data.events : [];
+  };
 
-    setEvents(initialEvents);
-    setIsLoaded(true);
+  // 서버에 시간표를 저장한다(있으면 덮어씀).
+  const putTimetable = async (name: string, list: TimetableEvent[]) => {
+    const res = await fetch(`/api/timetables?name=${encodeURIComponent(name)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ events: list }),
+    });
+    if (!res.ok) throw new Error("save failed");
+  };
+
+  // 앱 시작: 시간표 목록을 받아오고, 마지막에 보던 시간표를 서버에서 불러온다.
+  useEffect(() => {
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 60000);
+
+    (async () => {
+      // 구버전 공유 링크로 들어온 경우: 로컬 데이터를 대체할 일정을 먼저 확보한다.
+      let importedEvents: TimetableEvent[] | null = null;
+      let importedName: string | null = null;
+      const params = new URLSearchParams(window.location.search);
+      const sharedData = params.get("data");
+      if (sharedData) {
+        importedEvents = decodeLegacyShare(sharedData);
+        importedName = params.get("title");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      // refreshNameList가 돌려준 목록을 쓴다. state는 이 시점에 아직 갱신되지 않는다.
+      const names = await refreshNameList();
+
+      const localEvents = readLocalEvents();
+      const localTitle = readLocalTitle();
+      const isEmptyLocal = localEvents.length === 0;
+      // 로컬에 이 시간표가 아직 없어도, 마지막으로 쓰던 시간표가 서버에 있으면 그걸 연다.
+      const savedName = importedName || localTitle || DEFAULT_TIMETABLE_NAME;
+      const hasLocalForTitle = !isEmptyLocal && localTitle === savedName;
+
+      // 열어야 할 시간표를 고른다: 공유받은 데이터 → 로컬 데이터 → 서버의 최근 시간표 → 새 기본 시간표
+      let openedEvents: TimetableEvent[] = [];
+      let openedName = savedName;
+
+      try {
+        if (importedEvents) {
+          openedName = freeName(savedName, names);
+          const res = await fetch("/api/timetables", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: openedName, events: importedEvents }),
+          });
+          openedEvents = importedEvents;
+          if (res.ok) await refreshNameList();
+        } else if (hasLocalForTitle) {
+          await putTimetable(savedName, localEvents);
+          openedEvents = localEvents;
+          await refreshNameList();
+        } else if (!localTitle && names.length > 0) {
+          // 기억해 둔 이름이 없으면 서버의 가장 최근 시간표를 바로 연다.
+          openedName = names[0];
+          openedEvents = (await fetchTimetable(openedName)) ?? [];
+        } else {
+          const remote = await fetchTimetable(openedName);
+          if (remote !== null) {
+            openedEvents = remote;
+          } else if (!isEmptyLocal) {
+            // 서버에 아직 없는 시간표라면 로컬 내용을 올려서 만든다.
+            await putTimetable(openedName, localEvents);
+            openedEvents = localEvents;
+            await refreshNameList();
+          }
+        }
+      } catch {
+        // 서버에 못 닿으면 마지막으로 쓰던 로컬 데이터로 계속 동작한다
+        openedEvents = importedEvents || localEvents;
+        openedName = importedName || localTitle || DEFAULT_TIMETABLE_NAME;
+      }
+
+      // 불러온 내용을 곧바로 되쓰지 않도록 자동 저장을 한 번 건너뛴다.
+      skipNextSaveRef.current = true;
+      setEvents(openedEvents);
+      setTimetableTitle(openedName);
+
+      isLoadedRef.current = true;
+      setIsLoaded(true);
+    })();
+
     return () => clearInterval(timer);
   }, []);
 
   useIsomorphicLayoutEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("my-timetable-events", JSON.stringify(events));
-      initDraggables();
-    }
+    if (!isLoaded) return;
+    try {
+      localStorage.setItem(LOCAL_EVENTS_KEY, JSON.stringify(events));
+    } catch {}
+    initDraggables();
   }, [events, isLoaded]);
 
-  // 공유 기능: 극단적으로 짧은 커스텀 포맷으로 변환
+  // 일정이 바뀌면 자동 저장. 입력이 멈추고 600ms 뒤 한 번만 서버로 보낸다.
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+
+    setSaveStatus("saving");
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        await putTimetable(titleRef.current, eventsRef.current);
+        setSaveStatus("saved");
+      } catch {
+        setSaveStatus("error");
+      }
+    }, 600);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [events]);
+
+  // 제목이 바뀌면 로컬에도 기억해 두어 다음 실행 때 이 시간표로 시작한다.
+  useEffect(() => {
+    if (!isLoaded) return;
+    writeLocalTitle(timetableTitle);
+  }, [timetableTitle, isLoaded]);
+
   const handleShare = async () => {
     // 포맷: ID|D|START|END|TITLE|COLOR_IDX
     const customFormat = events.map(ev => {
@@ -198,20 +348,105 @@ export default function TimetablePage() {
     setIsMenuOpen(false);
   };
 
-  const handleEditTitle = () => {
-    const newTitle = window.prompt("시간표 제목을 입력하세요.", timetableTitle);
-    if (newTitle !== null && newTitle.trim() !== "") {
-      setTimetableTitle(newTitle.trim());
-      localStorage.setItem("my-timetable-title", newTitle.trim());
-    }
+  const handleEditTitle = async () => {
+    const input = window.prompt("시간표 제목을 입력하세요.", timetableTitle);
     setIsMenuOpen(false);
+    if (input === null) return;
+
+    const next = input.trim();
+    if (!next || next === timetableTitle) return;
+    if (/[\u0000-\u001f\u007f]/.test(next)) return alert("사용할 수 없는 문자가 포함되어 있습니다.");
+
+    if (timetableNames.includes(next)) {
+      return alert("같은 이름의 시간표가 이미 있습니다. 다른 이름을 사용하세요.");
+    }
+
+    try {
+      const res = await fetch("/api/timetables", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: timetableTitle, to: next }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return alert(data.error || "제목을 변경하지 못했습니다.");
+      }
+    } catch {
+      return alert("서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.");
+    }
+
+    // 제목만 바뀌었고 일정 내용은 그대로이므로 재저장은 건너뛴다.
+    skipNextSaveRef.current = true;
+    setTimetableTitle(next);
+    await refreshNameList();
   };
 
-  const handleDeleteAll = () => {
-    if (confirm("모든 일정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
-      setEvents([]);
+  const switchTimetable = async (name: string) => {
+    setIsListOpen(false);
+    if (name === timetableTitle) return;
+
+    try {
+      const list = await fetchTimetable(name);
+      if (list === null) {
+        alert("이미 삭제된 시간표입니다.");
+        return refreshNameList();
+      }
+      skipNextSaveRef.current = true; // 불러온 내용을 곧바로 되쓰지 않는다
+      setEvents(list);
+      setTimetableTitle(name);
+      setMenuData(null);
+    } catch {
+      alert("시간표를 불러오지 못했습니다. 서버 연결을 확인하세요.");
+    }
+  };
+
+  const createTimetable = async () => {
+    const input = window.prompt("새 시간표 이름을 입력하세요.");
+    if (input === null) return;
+
+    const name = input.trim();
+    if (!name) return;
+    if (/[\u0000-\u001f\u007f]/.test(name)) return alert("사용할 수 없는 문자가 포함되어 있습니다.");
+    if (timetableNames.includes(name)) {
+      return alert("같은 이름의 시간표가 이미 있습니다. 다른 이름을 사용하세요.");
+    }
+
+    try {
+      const res = await fetch("/api/timetables", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, events: [] }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return alert(data.error || "시간표를 만들지 못했습니다.");
+      }
+    } catch {
+      return alert("서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.");
+    }
+
+    skipNextSaveRef.current = true;
+    setIsListOpen(false);
+    setEvents([]);
+    setTimetableTitle(name);
+    await refreshNameList();
+  };
+
+  const handleDeleteAll = async () => {
+    if (!confirm(`"${timetableTitle}"의 모든 일정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      setIsMenuOpen(false);
+      return;
     }
     setIsMenuOpen(false);
+
+    try {
+      await putTimetable(timetableTitle, []);
+      skipNextSaveRef.current = true;
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+    setEvents([]);
   };
 
   // 잠금 상태 토글 함수
@@ -657,7 +892,13 @@ export default function TimetablePage() {
         </div>
       )}
 
-      <h1 className="timetable-main-title">{timetableTitle}</h1>
+      <h1 className="timetable-main-title" onClick={() => { refreshNameList(); setIsListOpen(true); setIsMenuOpen(false); }}>
+        {timetableTitle}
+        <span className="save-status">
+          {saveStatus === "saving" ? "저장 중…" : saveStatus === "error" ? "저장 실패" : "저장됨"}
+          {" · "}목록 ▾
+        </span>
+      </h1>
 
       {/* 플로팅 메뉴 버튼 */}
       <div className="fab-container">
@@ -814,6 +1055,31 @@ export default function TimetablePage() {
           </div>
         </div>
       </div>
+
+      {isListOpen && (
+        <div className="modal-overlay" onClick={() => setIsListOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>시간표 목록</h2>
+            <div className="timetable-list">
+              {timetableNames.length === 0 && <div className="timetable-list-empty">시간표가 없습니다.</div>}
+              {timetableNames.map(name => (
+                <button
+                  key={name}
+                  className={`timetable-list-item ${name === timetableTitle ? "active" : ""}`}
+                  onClick={() => switchTimetable(name)}
+                >
+                  {name}
+                  {name === timetableTitle && <span className="timetable-list-badge">사용 중</span>}
+                </button>
+              ))}
+            </div>
+            <div className="modal-buttons">
+              <button className="btn-cancel" onClick={() => setIsListOpen(false)}>닫기</button>
+              <button className="btn-save" onClick={createTimetable}>새 시간표</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="modal-overlay">

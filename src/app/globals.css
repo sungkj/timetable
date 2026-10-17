@@ -225,6 +225,63 @@ input, textarea, select {
   font-weight: bold;
   margin: 0 0 5px 0;
   color: var(--foreground);
+  cursor: pointer;
+}
+
+.save-status {
+  display: block;
+  font-size: 0.55rem;
+  font-weight: normal;
+  color: var(--label-color);
+  opacity: 0.8;
+}
+
+/* 시간표 목록 모달 */
+.timetable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+  margin-top: 15px;
+}
+
+.timetable-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--grid-line-hour);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timetable-list-item:hover {
+  background: var(--label-bg);
+}
+
+.timetable-list-item.active {
+  border-color: var(--primary-color);
+  background: var(--label-bg);
+  font-weight: bold;
+}
+
+.timetable-list-badge {
+  font-size: 0.7rem;
+  font-weight: normal;
+  color: var(--primary-color);
+}
+
+.timetable-list-empty {
+  padding: 20px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--label-color);
 }
 
 .timetable-header {
